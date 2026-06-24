@@ -19,4 +19,4 @@ AI 3D Exhibition — A browser-based 3D Gaussian Splatting (3DGS) scene viewer a
 
 Live on GitHub Pages:
 
-https://asnow365.github.io/gaza-world/
+https://asnow365.github.io/giza-world/
