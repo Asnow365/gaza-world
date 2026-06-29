@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giza World v2 - AI 3D Exhibition</title>
+
+  <!-- External: museum-themed tour styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Tailwind for utility classes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Inter:wght@400;600;700;850&display=swap');
+
+    :root {
+      --hud-bg: rgba(10,10,10,.75);
+      --hud-border: rgba(229,217,197,.12);
+      --hud-text: #e5d9c5;
+      --hud-muted: rgba(229,217,197,.4);
+      --hud-accent: #c9a96e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Serif SC', 'Inter', sans-serif;
+      overflow: hidden; background: #000;
+    }
+    canvas { display: block; }
+
+    /* ═══ Loading Overlay ═══ */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #0a0a0a; color: var(--hud-text);
+      transition: opacity 0.8s ease;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    #loading-overlay .load-title { font-size: 1.6rem; margin-bottom: 1.5rem; letter-spacing: .15em; }
+    .progress-track {
+      width: 280px; height: 3px;
+      background: rgba(229,217,197,.15); border-radius: 2px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; width: 0%; border-radius: 2px;
+      background: linear-gradient(90deg, #c9a96e, #e5d9c5);
+      transition: width .3s ease;
+    }
+    #loading-status { margin-top: .75rem; font-size: .85rem; opacity: .6; }
+
+    /* ═══ HUD ═══ */
+    #hud {
+      position: fixed; inset: 0; z-index: 10;
+      pointer-events: none;
+    }
+    #hud > * { pointer-events: auto; }
+
+    .hud-top {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 1rem 1.5rem .8rem;
+      background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 100%);
+      text-align: center;
+    }
+    .hud-top h1 {
+      font-size: 1rem; font-weight: 600;
+      color: var(--hud-text); letter-spacing: .2em;
+    }
+    .hud-top p {
+      font-size: .65rem; color: var(--hud-muted);
+      letter-spacing: .08em; margin-top: .1rem;
+    }
+
+    /* ═══ Scene Buttons ═══ */
+    .scene-btns {
+      position: absolute; bottom: 100px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 10px;
+    }
+    .hud-btn {
+      padding: .45rem 1.4rem;
+      background: rgba(229,217,197,.08);
+      border: 1px solid rgba(229,217,197,.18);
+      border-radius: 999px;
+      color: rgba(229,217,197,.55);
+      font-family: inherit; font-size: .75rem;
+      letter-spacing: .08em; cursor: pointer;
+      transition: all .3s ease;
+      backdrop-filter: blur(8px);
+    }
+    .hud-btn:hover { background: rgba(229,217,197,.13); color: var(--hud-text); }
+    .hud-btn.active {
+      background: rgba(201,169,110,.22);
+      border-color: var(--hud-accent); color: var(--hud-text);
+    }
+
+    /* ═══ Motion Bar ═══ */
+    .motion-bar {
+      position: absolute; bottom: 60px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 4px; align-items: center;
+    }
+    .motion-bar .hud-btn { font-size: .65rem; padding: .3rem .8rem; }
+
+    /* ═══ T2M Panel ═══ */
+    #t2m-panel {
+      position: absolute; bottom: 20px; right: 20px;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 10px;
+      backdrop-filter: blur(12px);
+      min-width: 210px; overflow: hidden;
+    }
+    .t2m-header {
+      padding: .5rem .9rem;
+      color: var(--hud-text); font-size: .7rem; letter-spacing: .04em;
+      cursor: pointer; user-select: none;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .t2m-header:hover { background: rgba(229,217,197,.04); }
+    #t2m-arrow { transition: transform .2s; font-size: .6rem; }
+    #t2m-arrow.collapsed { transform: rotate(-90deg); }
+    .t2m-body {
+      padding: 0 .9rem .65rem;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .t2m-body.hidden { display: none; }
+    .t2m-body select, .t2m-body input {
+      background: rgba(229,217,197,.06);
+      border: 1px solid var(--hud-border);
+      border-radius: 6px; padding: .35rem .5rem;
+      color: var(--hud-text); font-size: .65rem;
+      font-family: inherit; outline: none;
+    }
+    .t2m-body select:focus, .t2m-body input:focus { border-color: var(--hud-accent); }
+    .t2m-body select option { background: #1a1a1a; color: var(--hud-text); }
+    .t2m-body input::placeholder { color: rgba(229,217,197,.25); }
+    .t2m-body .hud-btn {
+      padding: .3rem; font-size: .65rem; text-align: center;
+    }
+    .t2m-body .hud-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+    /* ═══ Tour Toggle Button ═══ */
+    #tour-toggle {
+      position: absolute; top: 16px; right: 20px; z-index: 25;
+      padding: .45rem 1rem;
+      background: rgba(201,169,110,.15);
+      border: 1px solid rgba(201,169,110,.3);
+      border-radius: 999px;
+      color: var(--hud-accent); font-family: inherit;
+      font-size: .72rem; letter-spacing: .06em;
+      cursor: pointer; backdrop-filter: blur(10px);
+      transition: all .3s;
+    }
+    #tour-toggle:hover { background: rgba(201,169,110,.25); }
+    #tour-toggle.active { background: rgba(201,169,110,.3); border-color: var(--hud-accent); }
+
+    /* ═══ Tour Panel (right overlay) ═══ */
+    #tour-panel {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 20;
+      width: 340px; max-width: 90vw;
+      background: rgba(10,10,10,.92);
+      border-left: 1px solid var(--hud-border);
+      backdrop-filter: blur(16px);
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform .35s cubic-bezier(.4,0,.2,1);
+      padding: 1rem;
+    }
+    #tour-panel.open {
+      transform: translateX(0);
+    }
+    #tour-panel::-webkit-scrollbar { width: 4px; }
+    #tour-panel::-webkit-scrollbar-thumb { background: rgba(229,217,197,.15); border-radius: 2px; }
+
+    #tour-panel .tp-section {
+      background: rgba(229,217,197,.04);
+      border: 1px solid var(--hud-border);
+      border-radius: 12px;
+      padding: .85rem;
+      margin-bottom: .65rem;
+    }
+    #tour-panel .tp-section h3 {
+      font-size: .6rem; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--hud-muted);
+      margin-bottom: .5rem;
+    }
+    #tour-panel .tp-location {
+      font-size: .85rem; font-weight: 600;
+      color: var(--hud-text); letter-spacing: .04em;
+    }
+    #tour-panel .tp-npc {
+      display: flex; align-items: center; gap: 10px;
+      margin: .5rem 0;
+    }
+    #tour-panel .tp-avatar {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(145deg, #fff2d0, #b96c2d);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 800;
+      color: #3b210f; flex-shrink: 0;
+    }
+    #tour-panel .tp-npc-name {
+      font-size: .8rem; color: var(--hud-text); font-weight: 600;
+    }
+    #tour-panel .tp-npc-role {
+      font-size: .65rem; color: var(--hud-muted);
+    }
+    #tour-panel .tp-objective {
+      color: var(--hud-accent); font-size: .72rem;
+      padding: .5rem .6rem;
+      background: rgba(201,169,110,.08);
+      border-left: 2px solid var(--hud-accent);
+      border-radius: 0 6px 6px 0;
+      margin: .5rem 0;
+    }
+    #tour-panel .tp-accuracy {
+      font-size: .65rem; color: var(--hud-muted);
+      font-style: italic; margin-top: .3rem;
+    }
+    #tour-panel .tp-step {
+      font-size: .68rem; color: var(--hud-muted);
+      margin-bottom: .4rem;
+    }
+    #tour-panel .tp-progress {
+      height: 4px; border-radius: 2px;
+      background: rgba(229,217,197,.1);
+      margin: .5rem 0; overflow: hidden;
+    }
+    #tour-panel .tp-progress-fill {
+      height: 100%; border-radius: inherit;
+      background: var(--hud-accent);
+      transition: width .3s ease;
+    }
+
+    /* Tour badges */
+    .tp-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: .4rem 0; }
+    .tp-badge {
+      font-size: .58rem; font-weight: 700; letter-spacing: .04em;
+      padding: 3px 8px; border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .tp-badge.source { background: rgba(49,95,43,.3); color: #8fbc8f; border: 1px solid rgba(49,95,43,.5); }
+    .tp-badge.reconstructed { background: rgba(118,81,18,.3); color: #e2c87a; border: 1px solid rgba(118,81,18,.5); }
+    .tp-badge.speculative { background: rgba(138,47,26,.3); color: #e8a090; border: 1px solid rgba(138,47,26,.5); }
+    .tp-badge.review { background: rgba(90,52,118,.3); color: #c4a8dc; border: 1px solid rgba(90,52,118,.5); }
+
+    /* Tour choice buttons */
+    .tp-choices { display: flex; flex-direction: column; gap: 5px; margin-top: .5rem; }
+    .tp-choices button {
+      width: 100%; padding: .45rem .7rem;
+      background: rgba(229,217,197,.06);
+      border: 1px solid var(--hud-border);
+      border-radius: 8px;
+      color: var(--hud-text); font-family: inherit;
+      font-size: .7rem; cursor: pointer;
+      transition: all .2s; text-align: left;
+    }
+    .tp-choices button:hover {
+      background: rgba(201,169,110,.15);
+      border-color: var(--hud-accent);
+    }
+
+    /* Tour transcript */
+    .tp-transcript {
+      list-style: none; font-size: .65rem; color: var(--hud-muted);
+      max-height: 120px; overflow-y: auto;
+    }
+    .tp-transcript li {
+      padding: .25rem 0; border-bottom: 1px solid rgba(229,217,197,.05);
+    }
+    .tp-transcript li strong { color: var(--hud-text); }
+
+    /* ═══ Route Bar (bottom story stops) ═══ */
+    #route-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 15;
+      background: linear-gradient(0deg, rgba(0,0,0,.7) 0%, transparent 100%);
+      padding: .6rem 1rem;
+      display: flex; gap: 8px; justify-content: center;
+      overflow-x: auto;
+    }
+    #route-bar::-webkit-scrollbar { height: 2px; }
+    #route-bar::-webkit-scrollbar-thumb { background: rgba(229,217,197,.1); }
+    .route-chip {
+      flex-shrink: 0;
+      padding: .4rem .9rem;
+      background: rgba(229,217,197,.05);
+      border: 1px solid rgba(229,217,197,.1);
+      border-radius: 999px;
+      color: rgba(229,217,197,.45);
+      font-family: inherit; font-size: .68rem; letter-spacing: .04em;
+      cursor: pointer; transition: all .25s;
+      white-space: nowrap;
+    }
+    .route-chip:hover { background: rgba(229,217,197,.1); color: var(--hud-text); }
+    .route-chip.active {
+      background: rgba(201,169,110,.18);
+      border-color: var(--hud-accent); color: var(--hud-text);
+    }
+
+    /* ═══ Character View Panel ═══ */
+    #char-panel {
+      position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+      width: 230px; z-index: 15;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    #char-panel.hidden { display: none; }
+    .char-info {
+      text-align: center; padding: .5rem;
+      color: var(--hud-text);
+    }
+    .char-info .name { font-size: .95rem; font-weight: 600; letter-spacing: .08em; }
+    .char-info .motion { font-size: .65rem; color: var(--hud-muted); margin-top: 2px; }
+    .cp-section {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 10px; padding: .55rem .7rem;
+      backdrop-filter: blur(12px);
+    }
+    .cp-section h3 {
+      font-size: .58rem; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--hud-muted);
+      margin-bottom: .35rem;
+    }
+    .cp-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    #cp-switch { grid-template-columns: repeat(3, 1fr); }
+    .cp-presets button {
+      padding: .3rem; font-size: .6rem;
+      background: rgba(229,217,197,.05);
+      border: 1px solid var(--hud-border);
+      border-radius: 6px; color: rgba(229,217,197,.45);
+      cursor: pointer; transition: all .2s;
+      font-family: inherit;
+    }
+    .cp-presets button:hover { background: rgba(229,217,197,.08); color: var(--hud-text); }
+    .cp-presets button.active { background: rgba(201,169,110,.18); border-color: var(--hud-accent); color: var(--hud-text); }
+    .cp-input-row { display: flex; gap: 4px; }
+    .cp-input-row input {
+      flex: 1; background: rgba(229,217,197,.05);
+      border: 1px solid var(--hud-border);
+      border-radius: 6px; padding: .3rem .45rem;
+      color: var(--hud-text); font-size: .6rem;
+      font-family: inherit; outline: none;
+    }
+    .cp-input-row input:focus { border-color: var(--hud-accent); }
+    .cp-input-row input::placeholder { color: rgba(229,217,197,.18); }
+    .cp-input-row button {
+      padding: .3rem .6rem; font-size: .6rem;
+      background: rgba(201,169,110,.18);
+      border: 1px solid var(--hud-accent);
+      border-radius: 6px; color: var(--hud-text);
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .cp-input-row button:hover { background: rgba(201,169,110,.3); }
+    .cp-input-row button:disabled { opacity: .25; cursor: not-allowed; }
+
+    /* ═══ Scene Loading Hint ═══ */
+    #scene-loading {
+      position: absolute; bottom: 80px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(229,217,197,.65);
+      font-size: .75rem; letter-spacing: .04em;
+      opacity: 0; transition: opacity .4s;
+    }
+    #scene-loading.show { opacity: 1; }
+
+    /* ═══ Control Hint ═══ */
+    .hud-hint {
+      position: absolute; bottom: 48px; left: 50%;
+      transform: translateX(-50%);
+      font-size: .6rem; color: rgba(229,217,197,.2);
+      letter-spacing: .06em; white-space: nowrap;
+    }
+
+    /* ═══ Error Message ═══ */
+    #error-msg {
+      position: fixed; bottom: 50%; left: 50%;
+      transform: translate(-50%, 50%); z-index: 200;
+      background: rgba(180,60,60,.88);
+      color: #f0e0d0; padding: .8rem 1.6rem;
+      border-radius: 8px; font-size: .8rem;
+      text-align: center; display: none;
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(180,60,60,.35);
+    }
+
+    /* ═══ Home Page ═══ */
+    #home-view {
+      position: fixed; inset: 0; z-index: 50;
+      background: #0a0a0a; color: var(--hud-text);
+      overflow-y: auto; display: flex;
+      flex-direction: column; align-items: center;
+      padding: 3rem 1.5rem 4rem;
+    }
+    #home-view.hidden { display: none; }
+    #home-view h1 {
+      font-size: 1.8rem; font-weight: 700;
+      letter-spacing: .15em; margin-bottom: .25rem;
+    }
+    #home-view .subtitle {
+      font-size: .8rem; color: var(--hud-muted);
+      letter-spacing: .1em; margin-bottom: 2.5rem;
+    }
+    .home-section {
+      width: 100%; max-width: 720px; margin-bottom: 2rem;
+    }
+    .home-section h2 {
+      font-size: .85rem; text-transform: uppercase;
+      letter-spacing: .15em; color: rgba(229,217,197,.3);
+      margin-bottom: .75rem; padding-left: .25rem;
+    }
+    .home-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .home-card {
+      background: rgba(229,217,197,.04);
+      border: 1px solid rgba(229,217,197,.1);
+      border-radius: 12px; padding: 1.25rem 1rem;
+      cursor: pointer; transition: all .3s ease;
+      text-align: center;
+    }
+    .home-card:hover {
+      background: rgba(229,217,197,.08);
+      border-color: rgba(229,217,197,.25);
+      transform: translateY(-2px);
+    }
+    .home-card .icon { font-size: 1.6rem; margin-bottom: .5rem; }
+    .home-card .name { font-size: .9rem; font-weight: 600; margin-bottom: .2rem; }
+    .home-card .desc { font-size: .65rem; color: var(--hud-muted); }
+
+    /* ═══ View Container ═══ */
+    .view-3d { position: fixed; inset: 0; z-index: 10; }
+    .view-3d.hidden { display: none; }
+    .back-btn {
+      position: absolute; top: 16px; left: 16px; z-index: 25;
+      padding: .4rem 1rem; font-size: .72rem;
+      background: rgba(0,0,0,.5); border: 1px solid var(--hud-border);
+      border-radius: 6px; color: rgba(229,217,197,.55);
+      cursor: pointer; backdrop-filter: blur(8px);
+      transition: all .3s;
+    }
+    .back-btn:hover { background: rgba(229,217,197,.1); color: var(--hud-text); }
+
+    /* ═══ Responsive ═══ */
+    @media (max-width: 780px) {
+      #tour-panel { width: 100vw; max-width: 100vw; }
+      .scene-btns { bottom: 90px; }
+      .motion-bar { bottom: 52px; }
+      .hud-hint { bottom: 42px; }
+      #route-bar { padding: .4rem .5rem; gap: 4px; }
+      .route-chip { padding: .3rem .6rem; font-size: .6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Home Page ═══ -->
+  <div id="home-view">
+    <h1>Giza World</h1>
+    <div class="subtitle">AI 3D Exhibition · Guided Tour</div>
+
+    <div class="home-section">
+      <h2>Guided Tour</h2>
+      <div class="home-grid" id="tour-cards"></div>
+    </div>
+
+    <div class="home-section">
+      <h2>Scenes</h2>
+      <div class="home-grid" id="scene-cards"></div>
+    </div>
+
+    <div class="home-section">
+      <h2>Characters</h2>
+      <div class="home-grid" id="char-cards"></div>
+    </div>
+  </div>
+
+  <!-- ═══ 3D View ═══ -->
+  <div id="view-3d" class="view-3d hidden">
+    <button class="back-btn" id="back-btn">← Back</button>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+      <div class="load-title">Giza World · AI 3D Exhibition</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div id="loading-status">Initializing…</div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-top">
+        <h1>Giza World · AI 3D Exhibition</h1>
+        <p id="hud-subtitle">Scene View</p>
+      </div>
+
+      <button id="tour-toggle">☰ Tour Guide</button>
+
+      <div class="scene-btns" id="scene-btns">
+        <button class="hud-btn active" data-idx="0">Scene 1</button>
+        <button class="hud-btn" data-idx="1">Scene 2</button>
+      </div>
+
+      <div class="motion-bar" id="motion-bar">
+        <button class="hud-btn" id="motion-all">⏸ All</button>
+        <button class="hud-btn char-btn" data-char="0">Hathor ▶</button>
+        <button class="hud-btn char-btn" data-char="1">Menkaure ▶</button>
+      </div>
+
+      <!-- T2M Panel -->
+      <div id="t2m-panel">
+        <div class="t2m-header" id="t2m-toggle">⚡ Text-to-Motion <span id="t2m-arrow">▾</span></div>
+        <div class="t2m-body" id="t2m-body">
+          <select id="t2m-target">
+            <option value="0">The Goddess Hathor</option>
+            <option value="1">King Menkaure</option>
+            <option value="2">Ranefer</option>
+          </select>
+          <input id="t2m-prompt" type="text" placeholder="Describe the motion…" />
+          <button id="t2m-btn" class="hud-btn">Generate</button>
+        </div>
+      </div>
+
+      <div id="scene-loading">Loading scene…</div>
+      <div class="hud-hint">Drag to rotate · Scroll to zoom</div>
+    </div>
+
+    <!-- Tour Panel (right overlay) -->
+    <div id="tour-panel">
+      <div class="tp-section">
+        <h3>📍 Location</h3>
+        <div class="tp-location" id="tp-location">Giza Gallery</div>
+      </div>
+
+      <div class="tp-section">
+        <h3>🗿 Guide</h3>
+        <div class="tp-npc">
+          <div class="tp-avatar" id="tp-avatar">H</div>
+          <div>
+            <div class="tp-npc-name" id="tp-npc-name">Hathor</div>
+            <div class="tp-npc-role" id="tp-npc-role">Cultural guide</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tp-section">
+        <h3>📍 Progress</h3>
+        <div class="tp-step" id="tp-step">Stop 1 / 3</div>
+        <div class="tp-progress"><div class="tp-progress-fill" id="tp-progress-fill" style="width:33%"></div></div>
+        <div class="tp-objective" id="tp-objective">Current objective</div>
+        <div class="tp-accuracy" id="tp-accuracy"></div>
+      </div>
+
+      <div class="tp-section">
+        <h3>🏷️ Certainty</h3>
+        <div class="tp-badges" id="tp-badges"></div>
+      </div>
+
+      <div class="tp-section">
+        <h3>🧭 Choices</h3>
+        <div class="tp-choices" id="tp-choices"></div>
+      </div>
+
+      <div class="tp-section">
+        <h3>📜 Transcript</h3>
+        <ul class="tp-transcript" id="tp-transcript"></ul>
+      </div>
+    </div>
+
+    <!-- Route Bar (bottom) -->
+    <div id="route-bar"></div>
+
+    <!-- Error -->
+    <div id="error-msg"></div>
+
+    <!-- Character View Panel -->
+    <div id="char-panel" class="hidden">
+      <div class="char-info">
+        <div class="name" id="cp-name">Char</div>
+        <div class="motion" id="cp-motion">Default</div>
+      </div>
+
+      <div class="cp-section">
+        <h3>Switch Character</h3>
+        <div class="cp-presets" id="cp-switch">
+          <button data-idx="0">Hathor</button>
+          <button data-idx="1">Menkaure</button>
+          <button data-idx="2">Ranefer</button>
+        </div>
+      </div>
+
+      <div class="cp-section">
+        <h3>Motion Presets</h3>
+        <div class="cp-presets" id="cp-presets">
+          <button data-motion="1">1</button>
+          <button data-motion="2">2</button>
+          <button data-motion="3">3</button>
+          <button data-motion="4">4</button>
+          <button data-motion="5">5</button>
+        </div>
+      </div>
+
+      <div class="cp-section">
+        <h3>Text to Motion</h3>
+        <div class="cp-input-row">
+          <input id="t2m-input" type="text" placeholder="Describe the motion…" />
+          <button id="t2m-go">Generate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Import Map ═══ -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.1.0/spark.module.js"
+    }
+  }
+  </script>
+
+  <!-- ═══ Main Script ═══ -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
+    import { DragControls } from 'three/addons/controls/DragControls.js';
+
+    /* ═══════════════════════════════════════════
+       PART 1: CONFIGURATION
+       ═══════════════════════════════════════════ */
+
+    // 3D Scene files (Gaussian Splatting PLY)
+    const SCENE_FILES = [
+      'scene/1/2f07d44a6b43046c9d3208f2dd6f4e17.ply',
+      'scene/2/2e184245233163d44ec1ea2692df242b.ply',
+    ];
+
+    // Character base GLB files
+    const CHAR_FILES = [
+      'motion/1/ancient+egyptian+statue+3d+model (1).glb',   // Hathor
+      'motion/2/ancient+statue+3d+model.glb',                // Menkaure
+      'motion/4/stone+statue+3d+model.glb',                  // Ranefer
+    ];
+
+    // Character display names
+    const CHAR_NAMES = ['The Goddess Hathor', 'King Menkaure', 'Ranefer'];
+    const CHAR_SHORT_NAMES = ['Hathor', 'Menkaure', 'Ranefer'];
+
+    // Animation sets per character
+    const CHAR_ANIM_SETS = [null, null, null];
+    function buildAnimSets() {
+      CHAR_ANIM_SETS[0] = [
+        'motion/1/ancient+egyptian+statue+3d+model (1).glb',
+        'motion/1/ancient+egyptian+statue+3d+model (2).glb',
+        'motion/1/ancient+egyptian+statue+3d+model (3).glb',
+        'motion/1/ancient+egyptian+statue+3d+model (4).glb',
+        'motion/1/ancient+egyptian+statue+3d+model (5).glb',
+      ];
+      CHAR_ANIM_SETS[1] = [
+        'motion/2/ancient+statue+3d+model.glb',
+        'motion/2/ancient+statue+3d+model2.glb',
+        'motion/2/ancient+statue+3d+model3.glb',
+        'motion/2/ancient+statue+3d+model4.glb',
+      ];
+      CHAR_ANIM_SETS[2] = [
+        'motion/4/stone+statue+3d+model.glb',
+        'motion/4/stone+statue+3d+model2 (2).glb',
+        'motion/4/stone+statue+3d+model2 (3).glb',
+        'motion/4/stone+statue+3d+model2 (4).glb',
+        'motion/4/stone+statue+3d+model2 (5).glb',
+      ];
+    }
+    buildAnimSets();
+
+    // Character positions per scene
+    const CHAR_POSITIONS = [
+      [{ p: [-1.2, 0, 1.0], r: Math.PI / 8 }, { p: [ 1.2, 0, 1.0], r: -Math.PI / 8 }],
+      [{ p: [-1.2, 0, 1.0], r: Math.PI / 8 }, { p: [ 1.2, 0, 1.0], r: -Math.PI / 8 }],
+    ];
+
+    // Camera presets per scene
+    const SCENE_CAMERAS = [
+      { pos: [-0.93, 1.69, -3.95], target: [0, 0.8, 0] },
+      { pos: [-2.86, 1.52, 0.78], target: [0, 0.8, 0] },
+    ];
+
+    // Scene rotations
+    const SCENE_ROTATIONS = [
+      { x: -Math.PI / 2, y: 0, z: 0 },
+      { x: -Math.PI / 2, y: 0, z: 0 },
+    ];
+
+    /* ═══════════════════════════════════════════
+       PART 2: TOUR DATA & SYSTEM
+       ═══════════════════════════════════════════ */
+
+    const DATA_PATHS = {
+      characters: 'data/characters.json',
+      objects: 'data/objects.json',
+      stories: 'data/storyMoments.json',
+      scenes: 'data/immersiveScenes.json',
+    };
+
+    const badgeLabels = {
+      source: 'Source-based',
+      reconstructed: 'Reconstructed',
+      speculative: 'Speculative',
+      review: 'Needs review',
+    };
+
+    const tourTranscript = [];
+    let tourState = {
+      activeIndex: 0,
+      data: null,
+    };
+
+    // Tour helper functions
+    function badgeMarkup(badges = []) {
+      return badges
+        .map(b => `<span class="tp-badge ${b}">${badgeLabels[b] || b}</span>`)
+        .join('');
+    }
+
+    function tourCharById(id) {
+      return tourState.data?.characters?.find(c => c.id === id);
+    }
+
+    function tourObjectById(id) {
+      return tourState.data?.objects?.find(o => o.id === id);
+    }
+
+    function tourSceneById(id) {
+      return tourState.data?.scenes?.find(s => s.id === id);
+    }
+
+    function tourStoryIndexById(id) {
+      return tourState.data?.stories?.findIndex(s => s.id === id);
+    }
+
+    // Map tour story to 3D scene index
+    // story 0 (giza-gallery) → scene 0 | story 1 (giza-site) → scene 1 | story 2 (comparative) → scene 0
+    function mapStoryToSceneIdx(story) {
+      const sceneId = story.sceneId;
+      if (sceneId === 'giza-gallery') return 0;
+      if (sceneId === 'giza-site') return 1;
+      return 0; // comparative → scene 0
+    }
+
+    // Map tour character to 3D character index
+    function mapCharToIdx(characterId) {
+      if (characterId === 'hathor') return 0;
+      if (characterId === 'menkaure') return 1;
+      if (characterId === 'ranefer') return 2;
+      return 0;
+    }
+
+    async function loadTourData() {
+      const entries = await Promise.all(
+        Object.entries(DATA_PATHS).map(async ([key, path]) => {
+          try {
+            const resp = await fetch(path);
+            return [key, await resp.json()];
+          } catch (e) {
+            console.warn(`Tour data "${key}" not available:`, e.message);
+            return [key, []];
+          }
+        })
+      );
+      return Object.fromEntries(entries);
+    }
+
+    function renderRouteBar() {
+      if (!tourState.data) return;
+      const bar = document.getElementById('route-bar');
+      bar.innerHTML = tourState.data.stories
+        .map((story, i) => {
+          const scene = tourSceneById(story.sceneId);
+          return `<button class="route-chip${i === tourState.activeIndex ? ' active' : ''}" data-route="${i}">
+            ${i + 1}. ${scene?.label || story.location}
+          </button>`;
+        })
+        .join('');
+
+      bar.querySelectorAll('[data-route]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.route);
+          renderTour(idx);
+          applyTourTo3D(idx);
+        });
+      });
+    }
+
+    function updateRouteBarActive() {
+      document.querySelectorAll('#route-bar [data-route]').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.route) === tourState.activeIndex);
+      });
+    }
+
+    function renderTour(index = 0) {
+      if (!tourState.data) return;
+      const stories = tourState.data.stories;
+      if (!stories.length) return;
+
+      const story = stories[index];
+      const character = tourCharById(story.characterId);
+      const object = tourObjectById(character?.objectId);
+      const scene = tourSceneById(story.sceneId);
+
+      tourState.activeIndex = index;
+
+      document.getElementById('tp-location').textContent = scene?.label || story.location;
+      document.getElementById('tp-avatar').textContent = character?.displayName?.charAt(0) || '?';
+      document.getElementById('tp-npc-name').textContent = character?.displayName || story.characterId;
+      document.getElementById('tp-npc-role').textContent = character?.guideRole || '';
+      document.getElementById('tp-step').textContent = `Stop ${index + 1} / ${stories.length}`;
+      document.getElementById('tp-progress-fill').style.width = `${((index + 1) / stories.length) * 100}%`;
+      document.getElementById('tp-objective').textContent = story.objective;
+      document.getElementById('tp-accuracy').textContent = object?.publicUseStatus || '';
+      document.getElementById('tp-badges').innerHTML = badgeMarkup(story.certaintyBadges || []);
+
+      // Choice buttons
+      const choicesEl = document.getElementById('tp-choices');
+      choicesEl.innerHTML = (story.userChoice || []).map(choice => {
+        const nextIdx = tourStoryIndexById(choice.nextStoryId);
+        return `<button data-next="${nextIdx >= 0 ? nextIdx : index}">${choice.label}</button>`;
+      }).join('');
+
+      choicesEl.querySelectorAll('[data-next]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const nextIdx = Number(btn.dataset.next);
+          renderTour(nextIdx);
+          applyTourTo3D(nextIdx);
+        });
+      });
+
+      // Transcript
+      if (tourTranscript.at(-1) !== story.id) tourTranscript.push(story.id);
+      document.getElementById('tp-transcript').innerHTML = tourTranscript
+        .map((id, i) => `<li><strong>${i + 1}.</strong> ${id.replaceAll('-', ' ')}</li>`)
+        .join('');
+
+      // Update HUD subtitle
+      document.getElementById('hud-subtitle').textContent =
+        scene?.label || story.location;
+
+      updateRouteBarActive();
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 3: DOM REFERENCES
+       ═══════════════════════════════════════════ */
+    const overlay   = document.getElementById('loading-overlay');
+    const fillBar   = document.getElementById('progress-fill');
+    const loadStat  = document.getElementById('loading-status');
+    const sceneLoad = document.getElementById('scene-loading');
+    const errMsg    = document.getElementById('error-msg');
+    const homeView  = document.getElementById('home-view');
+    const view3d    = document.getElementById('view-3d');
+    const hudEl     = document.getElementById('hud');
+    const charPanel = document.getElementById('char-panel');
+    const tourPanel = document.getElementById('tour-panel');
+
+    /* ═══════════════════════════════════════════
+       PART 4: HOME PAGE CARDS
+       ═══════════════════════════════════════════ */
+    const NAV_CARDS = [
+      { section: 'scene-cards', type: 'scene', idx: 0, icon: '🏛️', name: 'Scene 1', desc: 'Giza Gallery' },
+      { section: 'scene-cards', type: 'scene', idx: 1, icon: '🏛️', name: 'Scene 2', desc: 'Giza Site' },
+      { section: 'char-cards', type: 'character', idx: 0, icon: '🕺', name: 'The Goddess Hathor', desc: '5 animations' },
+      { section: 'char-cards', type: 'character', idx: 1, icon: '🕺', name: 'King Menkaure', desc: '4 animations' },
+      { section: 'char-cards', type: 'character', idx: 2, icon: '🕺', name: 'Ranefer', desc: '5 animations' },
+      { section: 'tour-cards', type: 'tour', idx: 0, icon: '🧭', name: 'Guided Tour', desc: '3-stop museum journey' },
+    ];
+
+    function generateCards() {
+      NAV_CARDS.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'home-card';
+        div.innerHTML = `<div class="icon">${c.icon}</div><div class="name">${c.name}</div>${c.desc ? `<div class="desc">${c.desc}</div>` : ''}`;
+        div.addEventListener('click', () => switchView(c.type, c.idx));
+        document.getElementById(c.section).appendChild(div);
+      });
+    }
+    generateCards();
+
+    /* ═══════════════════════════════════════════
+       PART 5: VIEW STATE MANAGEMENT
+       ═══════════════════════════════════════════ */
+    let currentView = 'home';
+    let loadedScenes = new Set();
+    let loadedChars = false;
+
+    function switchView(type, idx) {
+      if (type === 'home') {
+        currentView = 'home';
+        homeView.classList.remove('hidden');
+        view3d.classList.add('hidden');
+        charPanel.classList.add('hidden');
+        tourPanel.classList.remove('open');
+        return;
+      }
+
+      currentView = type + idx;
+      homeView.classList.add('hidden');
+      view3d.classList.remove('hidden');
+      renderer.domElement.style.display = 'block';
+
+      if (type === 'scene') {
+        hudEl.style.display = '';
+        charPanel.classList.add('hidden');
+        if (!loadedScenes.has(idx)) {
+          loadSceneView(idx);
+        } else if (idx !== currentSceneIdx) {
+          switchScene(idx);
+        }
+      } else if (type === 'character') {
+        hudEl.style.display = 'none';
+        charPanel.classList.remove('hidden');
+        loadCharacterView(idx);
+      } else if (type === 'tour') {
+        // Tour mode: enter scene view with tour panel open
+        hudEl.style.display = '';
+        charPanel.classList.add('hidden');
+        tourPanel.classList.add('open');
+        document.getElementById('tour-toggle').classList.add('active');
+        const targetScene = tourState.activeIndex !== undefined
+          ? mapStoryToSceneIdx(tourState.data.stories[tourState.activeIndex])
+          : 0;
+        if (!loadedScenes.has(targetScene)) {
+          loadSceneView(targetScene);
+        } else if (targetScene !== currentSceneIdx) {
+          switchScene(targetScene);
+        }
+      }
+    }
+
+    document.getElementById('back-btn').addEventListener('click', () => switchView('home', 0));
+
+    /* ═══════════════════════════════════════════
+       PART 6: THREE.JS SETUP
+       ═══════════════════════════════════════════ */
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(...SCENE_CAMERAS[0].pos);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.6;
+    document.body.prepend(renderer.domElement);
+
+    const sparkRenderer = new SparkRenderer({
+      renderer,
+      covSplats: true,
+      enable2DGS: true,
+      maxStdDev: 3.5,
+      blurAmount: 0.2,
+    });
+    scene.add(sparkRenderer);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(...SCENE_CAMERAS[0].target);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance   = 1.5;
+    controls.maxDistance   = 15;
+    controls.maxPolarAngle = Math.PI / 2.1;
+    controls.update();
+
+    /* ─── Lighting ─── */
+    const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambient);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    /* ═══════════════════════════════════════════
+       PART 7: SPLAT SCENE MANAGEMENT
+       ═══════════════════════════════════════════ */
+    let currentSplatMesh = null;
+
+    function loadSplatScene(idx) {
+      return new Promise((resolve) => {
+        if (currentSplatMesh) scene.remove(currentSplatMesh);
+        const mesh = new SplatMesh({
+          url: SCENE_FILES[idx],
+          onProgress: (pct) => {
+            setProgress(10 + pct * 30, `Loading 3D scene…`);
+          },
+        });
+        const r = SCENE_ROTATIONS[idx];
+        mesh.rotation.set(r.x, r.y, r.z);
+        scene.add(mesh);
+        currentSplatMesh = mesh;
+        setTimeout(() => resolve(mesh), 2000);
+      });
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 8: CHARACTER MANAGEMENT
+       ═══════════════════════════════════════════ */
+    const gltfLoader = new GLTFLoader();
+    let charModels = [];
+
+    const charStates = CHAR_NAMES.map(name => ({
+      name,
+      paused: false,
+      mixer: null,
+      action: null,
+      animName: '',
+      extraClips: null,
+    }));
+
+    function setProgress(pct, text) {
+      fillBar.style.width = Math.min(pct, 100) + '%';
+      if (text) loadStat.textContent = text;
+    }
+
+    async function loadCharacters(onProgress) {
+      const total = CHAR_FILES.length;
+      const results = [];
+      for (let i = 0; i < total; i++) {
+        try {
+          const gltf = await new Promise((resolve, reject) => {
+            gltfLoader.load(CHAR_FILES[i], resolve, undefined, reject);
+          });
+          results.push(gltf);
+        } catch (e) {
+          console.warn(`Char ${i} load failed:`, e);
+          results.push(null);
+        }
+        onProgress?.((i + 1) / total, `Loading model ${i + 1}/${total}…`);
+      }
+      return results;
+    }
+
+    const charGroup = new THREE.Group();
+    scene.add(charGroup);
+
+    function clearCharacters() {
+      charStates.forEach(s => { s.mixer = null; s.action = null; s.extraClips = null; });
+      while (charGroup.children.length) {
+        charGroup.remove(charGroup.children[0]);
+      }
+    }
+
+    function placeCharacters(sceneIdx, maxChars = 2) {
+      clearCharacters();
+      updateMasterButton();
+      setTimeout(() => updateDragObjects(), 100);
+    }
+
+    function updateCharButton(i) {
+      const btn = document.querySelector(`.char-btn[data-char="${i}"]`);
+      if (!btn) return;
+      const state = charStates[i];
+      if (!state.action) {
+        btn.textContent = `${CHAR_SHORT_NAMES[i]} ✗`;
+        btn.classList.remove('active');
+        return;
+      }
+      btn.textContent = state.paused ? `${CHAR_SHORT_NAMES[i]} ▶` : `${CHAR_SHORT_NAMES[i]} ⏸`;
+      btn.classList.toggle('active', !state.paused);
+    }
+
+    function updateMasterButton() {
+      const allPaused = charStates.every(s => !s.action || s.paused);
+      const allActive = charStates.some(s => s.action);
+      const btn = document.getElementById('motion-all');
+      if (!allActive) { btn.textContent = '⏸ All'; return; }
+      btn.textContent = allPaused ? '▶ All' : '⏸ All';
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 9: SCENE SWITCHING
+       ═══════════════════════════════════════════ */
+    let currentSceneIdx = -1;
+
+    async function switchScene(idx) {
+      if (idx === currentSceneIdx) return;
+      sceneLoad.classList.add('show');
+      sceneLoad.textContent = 'Switching scene…';
+
+      try {
+        await loadSplatScene(idx);
+      } catch (e) {
+        console.error('Scene load failed:', e);
+        showError(`Scene ${idx + 1} failed to load`);
+        sceneLoad.classList.remove('show');
+        return;
+      }
+
+      const cam = SCENE_CAMERAS[idx];
+      camera.position.set(cam.pos[0], cam.pos[1], cam.pos[2]);
+      controls.target.set(cam.target[0], cam.target[1], cam.target[2]);
+      controls.update();
+
+      placeCharacters(idx);
+      currentSceneIdx = idx;
+      sceneLoad.classList.remove('show');
+
+      document.querySelectorAll('#scene-btns .hud-btn').forEach(b => {
+        b.classList.toggle('active', +b.dataset.idx === idx);
+      });
+    }
+
+    function showError(msg) {
+      errMsg.textContent = msg;
+      errMsg.style.display = 'block';
+      setTimeout(() => { errMsg.style.display = 'none'; }, 6000);
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 10: VIEW LOADERS
+       ═══════════════════════════════════════════ */
+    async function loadSceneView(idx) {
+      controls.minDistance = 1.5;
+      controls.maxDistance = 15;
+      controls.maxPolarAngle = Math.PI / 2.1;
+
+      overlay.classList.remove('hidden');
+      overlay.style.display = '';
+      setProgress(0, 'Initializing…');
+      await new Promise(r => setTimeout(r, 200));
+
+      if (!loadedChars) {
+        setProgress(5, 'Loading characters…');
+        charModels = await loadCharacters((ratio, text) => {
+          setProgress(5 + ratio * 40, text);
+        });
+        loadedChars = true;
+        setProgress(45, 'Characters ready');
+      }
+
+      setProgress(50, 'Loading 3D scene…');
+      try {
+        await loadSplatScene(idx);
+      } catch (e) {
+        console.error('Scene load failed:', e);
+        showError('Scene load failed');
+      }
+      setProgress(80, 'Scene ready');
+
+      placeCharacters(idx);
+      currentSceneIdx = idx;
+      loadedScenes.add(idx);
+      setProgress(100, 'All ready');
+
+      await new Promise(r => setTimeout(r, 400));
+      overlay.classList.add('hidden');
+      setTimeout(() => { overlay.style.display = 'none'; }, 900);
+    }
+
+    let charViewIdx = -1;
+
+    async function loadCharacterView(idx) {
+      if (currentSplatMesh) {
+        scene.remove(currentSplatMesh);
+        currentSplatMesh = null;
+      }
+
+      overlay.classList.remove('hidden');
+      overlay.style.display = '';
+      setProgress(10, 'Loading…');
+      await new Promise(r => setTimeout(r, 200));
+
+      if (!loadedChars) {
+        charModels = await loadCharacters((ratio, text) => {
+          setProgress(10 + ratio * 50, text);
+        });
+        loadedChars = true;
+      }
+
+      setProgress(70, 'Preparing…');
+      clearCharacters();
+
+      const model = charModels[idx];
+      if (model) {
+        const handle = new THREE.Mesh(
+          new THREE.BoxGeometry(1.4, 2.2, 1.4),
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+        );
+        handle.position.set(0, 1, 0);
+        handle.rotation.y = -Math.PI / 2;
+
+        const m = model.scene;
+        m.scale.set(3, 3, 3);
+        m.position.set(0, -1, 0);
+        handle.add(m);
+        charGroup.add(handle);
+
+        const state = charStates[idx];
+        if (model.animations?.length) {
+          state.mixer = new THREE.AnimationMixer(m);
+          state.action = state.mixer.clipAction(model.animations[0]);
+          state.action.play();
+          state.paused = false;
+          state.animName = 'Anim 1';
+        }
+
+        const animFiles = CHAR_ANIM_SETS[idx];
+        if (animFiles) {
+          state.extraClips = [];
+          for (let i = 1; i < animFiles.length; i++) {
+            try {
+              const gltf = await new Promise((resolve, reject) => {
+                gltfLoader.load(animFiles[i], resolve, undefined, reject);
+              });
+              if (gltf.animations?.length) {
+                state.extraClips.push(gltf.animations[0]);
+              }
+            } catch (e) {
+              console.warn(`Anim ${i} load failed:`, e);
+            }
+          }
+        }
+      }
+
+      camera.position.set(0, 1.2, 4);
+      controls.target.set(0, 1.2, 0);
+      controls.minDistance = 1;
+      controls.maxDistance = 20;
+      controls.maxPolarAngle = Math.PI;
+      controls.update();
+
+      charViewIdx = idx;
+
+      document.getElementById('cp-name').textContent = CHAR_NAMES[idx] || `Char ${idx}`;
+      const state = charStates[idx];
+      document.getElementById('cp-motion').textContent = state?.animName || 'Default';
+
+      setProgress(100, 'Ready');
+      await new Promise(r => setTimeout(r, 300));
+      overlay.classList.add('hidden');
+      setTimeout(() => { overlay.style.display = 'none'; }, 900);
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 11: TOUR → 3D COORDINATION
+       ═══════════════════════════════════════════ */
+    async function applyTourTo3D(storyIndex) {
+      if (!tourState.data) return;
+      const story = tourState.data.stories[storyIndex];
+      if (!story) return;
+
+      const sceneIdx = mapStoryToSceneIdx(story);
+      const charIdx = mapCharToIdx(story.characterId);
+
+      // Switch 3D scene if needed
+      if (currentSceneIdx !== sceneIdx) {
+        if (!loadedScenes.has(sceneIdx)) {
+          await loadSceneView(sceneIdx);
+        } else {
+          await switchScene(sceneIdx);
+        }
+      }
+
+      // The story objective/motion hint can be shown somewhere
+      document.getElementById('hud-subtitle').textContent =
+        `${story.motionIcon} ${story.motionPreset}`;
+    }
+
+    /* ═══════════════════════════════════════════
+       PART 12: TOUR PANEL TOGGLE
+       ═══════════════════════════════════════════ */
+    document.getElementById('tour-toggle').addEventListener('click', () => {
+      const isOpen = tourPanel.classList.toggle('open');
+      document.getElementById('tour-toggle').classList.toggle('active', isOpen);
+    });
+
+    /* ═══════════════════════════════════════════
+       PART 13: EVENT BINDINGS
+       ═══════════════════════════════════════════ */
+
+    // Scene buttons
+    document.querySelectorAll('#scene-btns .hud-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = +btn.dataset.idx;
+        if (idx === currentSceneIdx) return;
+        if (charModels.length === 0) return;
+        switchScene(idx);
+      });
+    });
+
+    // Motion: Play/Pause All
+    document.getElementById('motion-all').addEventListener('click', () => {
+      const allPaused = charStates.every(s => !s.action || s.paused);
+      charStates.forEach(s => {
+        if (s.action) {
+          s.paused = !allPaused;
+          s.action.paused = s.paused;
+        }
+      });
+      updateMasterButton();
+      document.querySelectorAll('.char-btn').forEach((_, i) => updateCharButton(i));
+    });
+
+    // Motion: Per-character toggle
+    document.querySelectorAll('.char-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = +btn.dataset.char;
+        const s = charStates[i];
+        if (!s.action) return;
+        s.paused = !s.paused;
+        s.action.paused = s.paused;
+        updateCharButton(i);
+        updateMasterButton();
+      });
+    });
+
+    // Drag controls
+    let dragControls = null;
+    function updateDragObjects() {
+      const objects = [];
+      charGroup.children.forEach(c => { if (c.isMesh) objects.push(c); });
+      if (!dragControls) {
+        dragControls = new DragControls(objects, camera, renderer.domElement);
+        dragControls.addEventListener('dragstart', () => { controls.enabled = false; });
+        dragControls.addEventListener('drag', (e) => {
+          e.object.position.z = Math.max(0.8, e.object.position.z);
+        });
+        dragControls.addEventListener('dragend', () => { controls.enabled = true; });
+      } else {
+        while (dragControls.objects.length) dragControls.objects.pop();
+        objects.forEach(o => dragControls.objects.push(o));
+      }
+    }
+
+    // T2M Panel toggle
+    let t2mCollapsed = false;
+    document.getElementById('t2m-toggle').addEventListener('click', () => {
+      t2mCollapsed = !t2mCollapsed;
+      document.getElementById('t2m-body').classList.toggle('hidden', t2mCollapsed);
+      document.getElementById('t2m-arrow').classList.toggle('collapsed', t2mCollapsed);
+    });
+
+    // T2M Generate (HUD)
+    document.getElementById('t2m-btn').addEventListener('click', () => {
+      const target = document.getElementById('t2m-target').value;
+      const prompt = document.getElementById('t2m-prompt').value.trim();
+      if (!prompt) return;
+      console.log(`[T2M] char ${target}: "${prompt}" — API not yet connected`);
+      showError('T2M API coming soon');
+    });
+
+    // Character panel: switch character
+    document.querySelectorAll('#cp-switch button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = +btn.dataset.idx;
+        if (idx === charViewIdx) return;
+        document.querySelectorAll('#cp-switch button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        switchView('character', idx);
+      });
+    });
+
+    // Character panel: motion presets
+    document.querySelectorAll('#cp-presets button').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const motionIdx = parseInt(btn.dataset.motion) - 1;
+        document.getElementById('cp-motion').textContent = `Anim ${motionIdx + 1}`;
+        document.querySelectorAll('#cp-presets button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const state = charStates[charViewIdx];
+        if (state?.extraClips && state.mixer) {
+          if (motionIdx === 0) {
+            const defaultClip = state.action._clip;
+            state.action.stop();
+            state.action = state.mixer.clipAction(defaultClip);
+            state.action.play();
+          } else {
+            const clip = state.extraClips[motionIdx - 1];
+            if (clip) {
+              state.action.stop();
+              state.action = state.mixer.clipAction(clip);
+              state.action.play();
+            }
+          }
+        }
+      });
+    });
+
+    // Character panel: T2M
+    document.getElementById('t2m-go').addEventListener('click', () => {
+      const prompt = document.getElementById('t2m-input').value.trim();
+      if (!prompt) { showError('Please describe the motion'); return; }
+      console.log(`[T2M] prompt: "${prompt}"`);
+      showError('T2M API coming soon');
+    });
+    document.getElementById('t2m-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('t2m-go').click();
+    });
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    /* ═══════════════════════════════════════════
+       PART 14: ANIMATION LOOP
+       ═══════════════════════════════════════════ */
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+
+      charStates.forEach(s => {
+        if (!s.paused && s.mixer) {
+          s.mixer.update(dt);
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    /* ═══════════════════════════════════════════
+       PART 15: INITIALIZATION
+       ═══════════════════════════════════════════ */
+    async function init() {
+      setProgress(0, 'Loading tour data…');
+
+      // Load tour data in background
+      try {
+        tourState.data = await loadTourData();
+        console.log('[Tour] Data loaded:', Object.keys(tourState.data));
+        renderRouteBar();
+        renderTour(0);
+      } catch (e) {
+        console.warn('[Tour] Data loading failed, tour disabled:', e.message);
+      }
+
+      // Brief loading screen then ready
+      await new Promise(r => setTimeout(r, 100));
+      overlay.classList.add('hidden');
+      setTimeout(() => { overlay.style.display = 'none'; }, 500);
+    }
+
+    init().catch(e => {
+      console.error(e);
+      showError('Init failed: ' + e.message);
+      overlay.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>
