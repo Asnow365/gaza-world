@@ -11,7 +11,6 @@
 
   <style>
     /* OpenAI-style clean geometric sans-serif */
-    * { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
 
     :root {
       --hud-bg: rgba(10,10,10,.75);
@@ -22,7 +21,7 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; }
+    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; overflow: hidden; background: #000; }
     canvas { display: block; }
 
     /* ═══ Loading Overlay ═══ */
@@ -619,10 +618,6 @@
       <div class="home-grid" id="scene-cards"></div>
     </div>
     <div class="home-section">
-      <h2>Account</h2>
-      <div class="home-grid" id="login-card-spot"></div>
-    </div>
-    <div class="home-section">
       <h2>Characters</h2>
       <div class="home-grid" id="char-cards"></div>
     </div>
@@ -894,19 +889,19 @@
     </div>
 
 
-    <!-- ═══ Agent Chat Panel ═══ -->
+    <!-- ========== Agent Chat Panel ========== -->
     <div class="right-panel" id="agent-panel">
       <div class="agent-welcome" id="agent-welcome">
-        <div class="agent-avatar">🏛️</div>
+        <div class="agent-avatar">&#127968;</div>
         <h4>Heritage Agent <span id="agent-mode-badge" class="local">local</span></h4>
         <p>Ask me anything about the Giza collection.<br>Try: "Show me Hathor" or "Tell me about the pyramids"</p>
       </div>
       <div class="agent-chips" id="agent-chips">
-        <button class="agent-chip" data-cmd="Show me the Goddess Hathor">🕺 Hathor</button>
-        <button class="agent-chip" data-cmd="Go to Scene 1">🏛️ Scene 1</button>
-        <button class="agent-chip" data-cmd="Tell me about the Old Kingdom">📚 Old Kingdom</button>
-        <button class="agent-chip" data-cmd="Compare Scene 1 and Scene 2">⚖️ Compare</button>
-        <button class="agent-chip" data-cmd="What materials were used?">🪨 Materials</button>
+        <button class="agent-chip" data-cmd="Show me the Goddess Hathor">&#x1f57a; Hathor</button>
+        <button class="agent-chip" data-cmd="Go to Scene 1">&#x1f3db; Scene 1</button>
+        <button class="agent-chip" data-cmd="Tell me about the Old Kingdom">&#x1f4da; Old Kingdom</button>
+        <button class="agent-chip" data-cmd="Compare Scene 1 and Scene 2">&#x2696; Compare</button>
+        <button class="agent-chip" data-cmd="What materials were used?">&#x1faa8; Materials</button>
       </div>
       <div class="agent-messages" id="agent-messages"></div>
       <div class="agent-typing" id="agent-typing">
@@ -1384,234 +1379,6 @@
       TripoAPI.userEmail = window._gizaAuth.user?.email || '';
       console.log('[Module] Session restored for:', TripoAPI.userEmail);
     }
-
-
-    /* ═══════════════════════════════════════════
-       PART 2.5: HERITAGE AGENT ENGINE + CONFIG
-       ═══════════════════════════════════════════ */
-
-    // Agent LLM config (set by config.js at runtime)
-    const AgentConfig = { apiKey: '', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions', mode: 'local' };
-
-    // Knowledge Base
-    const KB = {
-      c: {
-        hathor: { n:'Hathor', t:'Goddess of love, music, and motherhood', d:'Old Kingdom, Dynasty 4', p:'c. 2613-2494 BCE', r:'Divine mother of the pharaoh', f:'Worshipped for over 3000 years, one of Egypt's most ancient deities' },
-        menkaure: { n:'Menkaure', t:'Pharaoh of the 4th Dynasty', d:'Old Kingdom, Dynasty 4', p:'c. 2530-2510 BCE', r:'Builder of the third Giza pyramid', f:'His pyramid was originally 65.5m tall' },
-        ranefer: { n:'Ranefer', t:'High official of the 5th Dynasty', d:'Old Kingdom, Dynasty 5', p:'c. 2494-2345 BCE', r:'Overseer of royal works', f:'From Saqqara, the primary necropolis of Memphis' },
-      },
-      d: {
-        'old kingdom': 'The Old Kingdom (c. 2686-2181 BCE) is Egypt's "Age of the Pyramids". Dynasty 4 saw the Great Pyramids of Giza built under Khufu, Khafre, and Menkaure.',
-        'dynasty 4': 'The Fourth Dynasty (c. 2613-2494 BCE) produced Egypt's most famous monuments: the Giza pyramids.',
-        'dynasty 5': 'The Fifth Dynasty (c. 2494-2345 BCE) saw a shift toward solar temples and smaller pyramids.',
-      },
-      m: {
-        greywacke: 'A hard dark sandstone prized for statues. The Menkaure triad is carved from this material.',
-        limestone: 'The most common building stone in ancient Egypt. Used for pyramid casing and sculpture.',
-        granite: 'An extremely hard rock imported from Aswan (800km away). Used for sarcophagi and obelisks.',
-      },
-      s: {
-        giza: 'The Giza Plateau is home to the three Great Pyramids, the Sphinx, and numerous temples. Located 20km southwest of modern Cairo.',
-        saqqara: 'The necropolis of ancient Memphis, home to the Step Pyramid of Djoser (the first pyramid ever built).',
-      },
-    };
-
-    // Intent Detection
-    function detectIntent(text) {
-      const t = text.toLowerCase();
-      if (/show me|go to|navigate|switch|open|load/i.test(t)) {
-        const cm = t.match(/(hathor|menkaure|ranefer)/i);
-        if (cm) return { name:'navigate', target:'character', id:cm[1].toLowerCase() };
-        const sm = t.match(/scene\s*(\d)/i);
-        if (sm) return { name:'navigate', target:'scene', id:parseInt(sm[1])-1 };
-        if (/tour|guided/i.test(t)) return { name:'navigate', target:'tour' };
-      }
-      if (/compare|diff|versus|vs/i.test(t)) {
-        const sm2 = t.match(/scene\s*(\d).*scene\s*(\d)/i);
-        if (sm2) return { name:'compare', ids:[parseInt(sm2[1])-1,parseInt(sm2[2])-1] };
-      }
-      if (/tell me|what is|who is|describe|explain/i.test(t)) {
-        for (const k of Object.keys(KB.c)) if (t.includes(k)) return { name:'search', type:'character', id:k };
-        for (const k of Object.keys(KB.d)) if (t.includes(k)) return { name:'search', type:'dynasty', id:k };
-        for (const k of Object.keys(KB.m)) if (t.includes(k)) return { name:'search', type:'material', id:k };
-        for (const k of Object.keys(KB.s)) if (t.includes(k)) return { name:'search', type:'site', id:k };
-        return { name:'search', type:'general' };
-      }
-      if (/generate|create/i.test(t)) {
-        if (/motion|animation/i.test(t)) return { name:'generate', subtype:'motion' };
-        if (/model|3d/i.test(t)) return { name:'generate', subtype:'model' };
-      }
-      if (/^(hi|hello|hey)/i.test(t)) return { name:'greet' };
-      if (/help|what can you do/i.test(t)) return { name:'help' };
-      return { name:'fallback' };
-    }
-
-    // Tool Executor
-    const Tools = {
-      navigate(intent) {
-        if (intent.target === 'character') {
-          const idx = {hathor:0,menkaure:1,ranefer:2}[intent.id];
-          if (idx !== undefined) { switchView('character', idx); return 'Showing '+KB.c[intent.id].n+'. Explore animations in the character panel.'; }
-        }
-        if (intent.target === 'scene' && (intent.id===0||intent.id===1)) {
-          if (currentView.startsWith('home')) switchView('scene', intent.id);
-          else switchScene(intent.id);
-          return 'Navigated to Scene '+(intent.id+1)+'.';
-        }
-        if (intent.target === 'tour') { switchView('tour', 0); return 'Opening the guided tour.'; }
-        return 'Try: "Show me Hathor" or "Go to Scene 1".';
-      },
-      search(intent) {
-        if (intent.type==='character') { const c=KB.c[intent.id]; return c?c.n+' - '+c.t+'. Dynasty: '+c.d+'. '+c.f:''; }
-        if (intent.type==='dynasty') return KB.d[intent.id]||'';
-        if (intent.type==='material') return KB.m[intent.id]||'';
-        if (intent.type==='site') return KB.s[intent.id]||'';
-        return 'Try asking about Hathor, Menkaure, the Old Kingdom, or Giza.';
-      },
-      compare(intent) {
-        if (intent.ids) return 'Scene '+(intent.ids[0]+1)+' vs Scene '+(intent.ids[1]+1)+': both from the Old Kingdom. Scene 1 shows museum context; Scene 2 shows outdoor monument approach.';
-        return 'Try "Compare Scene 1 and Scene 2".';
-      },
-      generate(intent) {
-        if (intent.subtype==='motion') return 'Open the AI Studio panel and use the Text-Motion tab. Describe any motion in natural language.';
-        return 'Open the AI Studio panel for AI generation capabilities.';
-      },
-      greet() { return 'Hello! I am your Heritage Agent. I can navigate, search knowledge, compare artifacts, and help you generate 3D content. Try: "Show me the pyramids" or "Tell me about the Old Kingdom".'; },
-      help() { return 'I can: 🕺 Navigate to characters | 🏛️ Switch scenes | 📚 Answer questions | ⚖️ Compare artifacts | 🎨 Generate 3D content. Try: "Show me Hathor" or "What is greywacke?"'; },
-      fallback() { return 'I am not sure I understand. Try: "Show me Hathor", "Tell me about the pyramids", or "Compare the scenes".'; },
-    };
-
-    // Agent Core
-    const Agent = {
-      history: [],
-      async process(input) {
-        this.history.push({role:'user',content:input});
-        if (this.history.length > 20) this.history.splice(0,2);
-        showTyping(true);
-        let resp;
-        if (AgentConfig.mode==='llm' && AgentConfig.apiKey) {
-          resp = await this._llm(input);
-        } else {
-          await new Promise(r=>setTimeout(r,400+Math.random()*600));
-          const intent = detectIntent(input);
-          resp = (Tools[intent.name]||Tools.fallback)(intent);
-        }
-        showTyping(false);
-        this.history.push({role:'agent',content:resp});
-        return resp;
-      },
-      async _llm(input) {
-        const sys = 'You are a Heritage Agent for the Giza World 3D exhibition. You help users explore ancient Egyptian heritage. Available: Hathor (goddess), Menkaure (pharaoh), Ranefer (official). Two 3D scenes. Keep responses 2-4 sentences, helpful, and suggest next actions.';
-        const msgs = [{role:'system',content:sys},...this.history.slice(-10).map(h=>({role:h.role==='agent'?'assistant':'user',content:h.content}))];
-        try {
-          const r = await fetch(AgentConfig.endpoint, {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+AgentConfig.apiKey},body:JSON.stringify({model:AgentConfig.model,max_tokens:300,messages:msgs})});
-          const d = await r.json();
-          if (d.error) throw new Error(d.error.message);
-          return d.choices[0].message.content;
-        } catch(e) { console.warn('[Agent] LLM fail, local fallback'); return Tools[detectIntent(input).name](detectIntent(input)); }
-      },
-    };
-
-    // Config loader
-    async function loadConfig() {
-      try {
-        const m = await import('./config.js');
-        if (m.AGENT_API_KEY) { const k = atob(m.AGENT_API_KEY); if (k.startsWith('sk-')) { AgentConfig.apiKey = k; AgentConfig.mode = 'llm'; } }
-        if (m.TRIPOSR_API_KEY) { const k = atob(m.TRIPOSR_API_KEY); if (k.startsWith('tcli_')) { TripoAPI.apiKey = k; } }
-        console.log('[Config] Loaded. Agent:',AgentConfig.mode,'TripoSR:',TripoAPI.apiKey?'yes':'no');
-      } catch(e) { console.log('[Config] No config.js'); }
-      document.getElementById('agent-mode-badge').textContent = AgentConfig.mode;
-      document.getElementById('agent-mode-badge').className = AgentConfig.mode;
-    }
-
-    // Chat UI
-    function addMsg(role, text) {
-      const el = document.getElementById('agent-messages');
-      const w = document.getElementById('agent-welcome');
-      if (w) w.style.display = 'none';
-      const d = document.createElement('div');
-      d.className = 'agent-msg '+role;
-      if (role==='agent') d.innerHTML = '<div class="al"><span class="ad"></span> Heritage Agent</div>'+text.replace(/\n/g,'<br>');
-      else d.textContent = text;
-      el.appendChild(d); el.scrollTop = el.scrollHeight;
-    }
-    function showTyping(s) { const el = document.getElementById('agent-typing'); if (el) el.classList.toggle('show', s); }
-
-    async function sendAgent() {
-      const inp = document.getElementById('agent-input');
-      const btn = document.getElementById('agent-send');
-      const txt = inp.value.trim();
-      if (!txt) return;
-      inp.value = ''; btn.disabled = true;
-      addMsg('user', txt);
-      const resp = await Agent.process(txt);
-      addMsg('agent', resp);
-      btn.disabled = false; inp.focus();
-    }
-
-    // Event bindings (deferred to after DOM ready via init)
-    function bindAgent() {
-      document.getElementById('agent-send').addEventListener('click', sendAgent);
-      document.getElementById('agent-input').addEventListener('keydown', e => { if (e.key==='Enter') sendAgent(); });
-      document.querySelectorAll('.agent-chip').forEach(chip => {
-        chip.addEventListener('click', () => { document.getElementById('agent-input').value = chip.dataset.cmd; sendAgent(); });
-      });
-      document.getElementById('btn-agent').addEventListener('click', () => {
-        const ap = document.getElementById('agent-panel');
-        const isOpen = ap.classList.contains('open');
-        if (isOpen) { ap.classList.remove('open'); document.getElementById('btn-agent').classList.remove('active'); }
-        else {
-          document.getElementById('tour-panel').classList.remove('open');
-          document.getElementById('ai-studio-panel').classList.remove('open');
-          document.getElementById('btn-tour').classList.remove('active');
-          document.getElementById('btn-ai').classList.remove('active');
-          ap.classList.add('open');
-          document.getElementById('btn-agent').classList.add('active');
-          if (currentView==='home') switchView('scene', 0);
-          document.getElementById('agent-input').focus();
-        }
-      });
-    }
-
-    // Login card
-    function addLoginCard() {
-      const spot = document.getElementById('login-card-spot');
-      if (!spot) return;
-      const card = document.createElement('div');
-      card.className = 'home-card';
-      card.id = 'login-home-card';
-      card.innerHTML = '<div class="icon">🔑</div><div class="name">Sign In</div><div class="desc">Unlock unlimited AI</div>';
-      card.addEventListener('click', () => {
-        const auth = window._gizaAuth;
-        if (auth?.isLoggedIn) { googleLogout(); updateLoginCardUI(); }
-        else { const t = document.querySelector('#g_id_signin_target div[role=button]'); if (t) t.click(); }
-      });
-      spot.appendChild(card);
-      window.addEventListener('giza-auth-change', () => updateLoginCardUI());
-    }
-    function updateLoginCardUI() {
-      const card = document.getElementById('login-home-card');
-      if (!card) return;
-      const auth = window._gizaAuth;
-      if (auth?.isLoggedIn && auth?.user) {
-        card.querySelector('.icon').textContent = '👤';
-        card.querySelector('.name').textContent = auth.user.given_name || auth.user.name;
-        card.querySelector('.desc').textContent = 'Click to sign out';
-      } else {
-        card.querySelector('.icon').textContent = '🔑';
-        card.querySelector('.name').textContent = 'Sign In';
-        card.querySelector('.desc').textContent = 'Unlock unlimited AI';
-      }
-    }
-
-    // Init extension
-    const _origInit = init;
-    init = async function() {
-      await loadConfig();
-      bindAgent();
-      addLoginCard();
-      return _origInit();
-    };
 
     /* ═══════════════════════════════════════════
        PART 3: AI STUDIO PANEL LOGIC
