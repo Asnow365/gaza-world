@@ -9,7 +9,16 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Inter:wght@400;600;700;850&display=swap');
+    /* Fonts: use system fonts for instant load; Google Fonts loaded async as enhancement */
+    /* Noto Serif SC & Inter loaded non-blocking */
+    @font-face {
+      font-family: 'Noto Serif SC'; font-display: swap;
+      src: local('Noto Serif SC'), local('SimSun'), local('serif');
+    }
+    @font-face {
+      font-family: 'Inter'; font-display: swap;
+      src: local('Inter'), local('Segoe UI'), local('system-ui');
+    }
 
     :root {
       --hud-bg: rgba(10,10,10,.75);
