@@ -38,6 +38,6 @@ Collection: Egyptian Museum, Cairo, JE 10063; CG 19
 Note: Created with Polycam and iPhone 15 by Peter Der Manuelian, February 23, 2024.
 Usage: Non-commercial, study purposes only.
 
-## Harvard Digital Giza Project
+## Data Sources
 This demo is conceptually inspired by the Digital Giza Project, which also provides important data and reference materials for this project.
 Digital Giza: https://giza.fas.harvard.edu/
